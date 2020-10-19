@@ -88,48 +88,32 @@ abstract class BaseServiceProvider extends ServiceProvider implements Module
      */
     public function boot()
     {
-        if ($this->areMigrationsEnabled()) {
+        if ($this->config('migrations', true)) {
             $this->registerMigrations();
         }
 
-        if ($this->areModelsEnabled()) {
+        if ($this->config('models', true)) {
             $this->registerModels();
             $this->registerEnums();
             $this->registerRequestTypes();
         }
 
-        if ($this->areViewsEnabled()) {
+        if ($this->config('views', true)) {
             $this->registerViews();
         }
 
         if ($routes = $this->config('routes', true)) {
-            $this->registerRoutes($routes);
+            $routeRegistrar = new RouteRegistrar($this, $this->convention);
+            if (true === $routes) {
+                $routeRegistrar->registerAllRoutes();
+            } elseif (isset($routes['files'])) {
+                $routeRegistrar->registerRoutes($this->config('routes.files'), $this->config('routes'));
+            } elseif (isset($routes[0]) && is_array($routes[0])) {
+                foreach ($routes as $route) {
+                    $routeRegistrar->registerRoutes($route['files'], $route);
+                }
+            }
         }
-
-        $this->publishes([
-            $this->getBasePath() . '/' . $this->convention->migrationsFolder() =>
-                database_path('migrations')
-        ], 'migrations');
-    }
-
-    public function areMigrationsEnabled(): bool
-    {
-        return (bool) $this->config('migrations', true);
-    }
-
-    public function areModelsEnabled(): bool
-    {
-        return (bool) $this->config('models', true);
-    }
-
-    public function areViewsEnabled(): bool
-    {
-        return (bool) $this->config('views', true);
-    }
-
-    public function areRoutesEnabled(): bool
-    {
-        return (bool) $this->config('routes', true);
     }
 
     /**
@@ -317,20 +301,6 @@ abstract class BaseServiceProvider extends ServiceProvider implements Module
 
         if (file_exists($cfgFile)) {
             $this->mergeConfigFrom($cfgFile, $this->getId());
-        }
-    }
-
-    protected function registerRoutes($routes): void
-    {
-        $routeRegistrar = new RouteRegistrar($this, $this->convention);
-        if (true === $routes) {
-            $routeRegistrar->registerAllRoutes();
-        } elseif (isset($routes['files'])) {
-            $routeRegistrar->registerRoutes($this->config('routes.files'), $this->config('routes'));
-        } elseif (isset($routes[0]) && is_array($routes[0])) {
-            foreach ($routes as $route) {
-                $routeRegistrar->registerRoutes($route['files'], $route);
-            }
         }
     }
 }
